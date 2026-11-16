@@ -97,9 +97,9 @@ func TestPasswordAccountLifecycle(t *testing.T) {
 		t.Fatal("deployment must be empty")
 	}
 	recovery := randomBytes(32)
-	const original = "original-password"
-	const changed = "updated-password"
-	const reset = "recovered-password"
+	const original = "a"
+	const changed = "b"
+	const reset = "c"
 	assert(server.AddPasswordUser(ctx, "alice", original, recovery))
 	assert(server.AddPasswordUser(ctx, "friend", original, recovery))
 	if err = server.AddPasswordUser(ctx, "ALICE", original, recovery); err == nil {

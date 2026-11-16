@@ -23,7 +23,7 @@ func normalizedLogin(login string) string {
 }
 
 func ValidAccountPassword(password string) bool {
-	return len(password) >= 12 && len(password) <= 1024
+	return len(password) > 0 && len(password) <= 1024
 }
 
 type accountEnvelope struct {
@@ -134,7 +134,7 @@ func (m *ManagedServer) AddPasswordUser(ctx context.Context, login, password str
 		return errors.New("login must use 1–64 letters, digits, dots, dashes or underscores")
 	}
 	if !ValidAccountPassword(password) {
-		return errors.New("password must be 12–1024 bytes")
+		return errors.New("password must be non-empty and at most 1024 bytes")
 	}
 	id := opaqueID()
 	key := randomBytes(32)
@@ -166,7 +166,7 @@ func (m *ManagedServer) AddPasswordUser(ctx context.Context, login, password str
 
 func (m *ManagedServer) ResetAccountPassword(ctx context.Context, login, password string, recoveryKey []byte) error {
 	if !ValidAccountPassword(password) {
-		return errors.New("password must be 12–1024 bytes")
+		return errors.New("password must be non-empty and at most 1024 bytes")
 	}
 	a, err := m.passwordAccount(ctx, login)
 	if errors.Is(err, pgx.ErrNoRows) {

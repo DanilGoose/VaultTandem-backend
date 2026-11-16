@@ -40,7 +40,7 @@ func readPassword() (string, error) {
 		return "", errors.New("passwords do not match")
 	}
 	if !syncstore.ValidAccountPassword(string(password)) {
-		return "", errors.New("password must be 12–1024 bytes")
+		return "", errors.New("password must be non-empty and at most 1024 bytes")
 	}
 	return string(password), nil
 }
