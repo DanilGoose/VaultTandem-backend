@@ -208,6 +208,19 @@ func (m *ManagedServer) Handler() http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
+		if strings.HasPrefix(r.URL.Path, "/api/") || strings.HasPrefix(r.URL.Path, "/sync/") {
+			w.Header().Add("Vary", "Origin")
+			if r.Header.Get("Origin") == "capacitor://localhost" {
+				w.Header().Set("Access-Control-Allow-Origin", "capacitor://localhost")
+				if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+					w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
+					w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Ciphertext-SHA256, X-Content-Lease, X-Sync-Compaction, X-Sync-Content, X-Sync-Continuity, X-Sync-Continuity-From, X-Sync-Continuity-Next, X-Sync-Metadata, X-Sync-Objects, X-Sync-Read-Only, X-Sync-Snapshots")
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				w.Header().Set("Access-Control-Expose-Headers", "X-Ciphertext-SHA256, X-Sync-Continuity-Token")
+			}
+		}
 		if strings.HasPrefix(r.URL.Path, "/admin") {
 			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; frame-ancestors 'none'; form-action 'self'")
 			if r.Method != "GET" && !sameOrigin(r) {
