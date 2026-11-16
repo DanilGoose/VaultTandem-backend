@@ -55,7 +55,7 @@ func contractStore(t *testing.T, configure ...func(*Config)) *Store {
 	c.MetadataMode = "full" // Original complete-graph contracts remain a distinct migration oracle.
 	c.Epoch = "epoch-1"
 	c.KeyPackage = json.RawMessage(`{"fixture":true}`)
-	c.Devices = []Device{{"computer-a", "电脑 A", strings.Repeat("a", 64)}, {"computer-b", "电脑 B", strings.Repeat("b", 64)}}
+	c.Devices = []Device{{"computer-a", "Computer A", strings.Repeat("a", 64)}, {"computer-b", "Computer B", strings.Repeat("b", 64)}}
 	for _, change := range configure {
 		change(&c)
 	}

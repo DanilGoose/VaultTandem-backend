@@ -73,7 +73,7 @@ func (m *ManagedServer) CreateUser(ctx context.Context, name string) (User, stri
 	if e != nil {
 		return User{}, "", controlError(e)
 	}
-	if e = audit(ctx, tx, "创建用户「"+name+"」并生成访问 key"); e != nil {
+	if e = audit(ctx, tx, "Created user "+name+" and generated an access key"); e != nil {
 		return User{}, "", e
 	}
 	if e = tx.Commit(ctx); e != nil {
@@ -94,7 +94,7 @@ func (m *ManagedServer) RotateKey(ctx context.Context, id string) (string, error
 	if e != nil {
 		return "", code("USER_NOT_FOUND")
 	}
-	if e = audit(ctx, tx, "刷新用户「"+name+"」的访问 key，旧设备授权失效"); e != nil {
+	if e = audit(ctx, tx, "Rotated the access key for "+name+" and revoked old device tokens"); e != nil {
 		return "", e
 	}
 	return secret, tx.Commit(ctx)
@@ -110,11 +110,11 @@ func (m *ManagedServer) SetUserActive(ctx context.Context, id string, active boo
 	if e = tx.QueryRow(ctx, "UPDATE sync_users SET active=$2 WHERE id=$1 AND deleted_at IS NULL RETURNING name", id, active).Scan(&name); e != nil {
 		return code("USER_NOT_FOUND")
 	}
-	action := "停用"
+	action := "Disabled "
 	if active {
-		action = "恢复"
+		action = "Enabled "
 	}
-	if e = audit(ctx, tx, action+"用户「"+name+"」"); e != nil {
+	if e = audit(ctx, tx, action+"user "+name); e != nil {
 		return e
 	}
 	return tx.Commit(ctx)
@@ -154,7 +154,7 @@ func (m *ManagedServer) DeleteUser(ctx context.Context, id, name string) (bool, 
 	if _, e = tx.Exec(ctx, "UPDATE sync_users SET active=false,key_hash=NULL,deleted_at=now() WHERE id=$1", id); e != nil {
 		return false, e
 	}
-	if e = audit(ctx, tx, "删除用户「"+actual+"」及其所属远端库"); e != nil {
+	if e = audit(ctx, tx, "Deleted user "+actual+" and vaults"); e != nil {
 		return false, e
 	}
 	if e = tx.Commit(ctx); e != nil {

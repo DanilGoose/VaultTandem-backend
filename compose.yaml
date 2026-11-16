@@ -4,7 +4,7 @@ x-backend: &backend
   image: private-xsync-server:local
   build:
     context: .
-    dockerfile: server/Dockerfile
+    dockerfile: Dockerfile
   network_mode: host
   environment:
     XSYNC_DATABASE_URL: "postgres://xsync:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@127.0.0.1:55439/xsync?sslmode=disable"

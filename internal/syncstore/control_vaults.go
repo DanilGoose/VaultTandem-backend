@@ -86,7 +86,7 @@ func (m *ManagedServer) CreateVault(ctx context.Context, u User, in NewVault) (M
 	if e = s.initializeCompaction(ctx, tx); e != nil {
 		return ManagedVault{}, e
 	}
-	if e = audit(ctx, tx, "用户「"+u.Name+"」创建同步库「"+name+"」"); e != nil {
+	if e = audit(ctx, tx, "user "+u.Name+" created vault "+name); e != nil {
 		return ManagedVault{}, e
 	}
 	if e = tx.Commit(ctx); e != nil {

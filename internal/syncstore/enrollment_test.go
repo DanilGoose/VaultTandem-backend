@@ -37,7 +37,7 @@ func TestEnrollmentLostReceiptRestartAndRevocation(t *testing.T) {
 	s, key := enrollmentStore(t)
 	ctx := context.Background()
 	token := strings.Repeat("c", 64)
-	in := signedEnrollment(t, s, key, "new-phone", "手机 <&> 😀", token)
+	in := signedEnrollment(t, s, key, "new-phone", "Phone <&> 😀", token)
 	if e := s.Enroll(ctx, in); e != nil {
 		t.Fatal(e)
 	}
@@ -77,7 +77,7 @@ func TestEnrollmentLostReceiptRestartAndRevocation(t *testing.T) {
 func TestEnrollmentTamperExpiryAndConcurrentNames(t *testing.T) {
 	s, key := enrollmentStore(t)
 	ctx := context.Background()
-	in := signedEnrollment(t, s, key, "one", "电脑 A", strings.Repeat("a", 64))
+	in := signedEnrollment(t, s, key, "one", "Computer A", strings.Repeat("a", 64))
 	altered := in
 	altered.TokenHash = strings.Repeat("b", 64)
 	expectCode(t, s.Enroll(ctx, altered), "UNAUTHORIZED")
@@ -126,14 +126,14 @@ func TestEnrollmentRotationCannotReplayOldToken(t *testing.T) {
 	ctx := context.Background()
 	a := strings.Repeat("a", 64)
 	b := strings.Repeat("b", 64)
-	old := signedEnrollment(t, s, key, "one", "电脑", a)
+	old := signedEnrollment(t, s, key, "one", "Computer", a)
 	if e := s.Enroll(ctx, old); e != nil {
 		t.Fatal(e)
 	}
 	if e := s.OpenEnrollment(ctx, time.Minute); e != nil {
 		t.Fatal(e)
 	}
-	next := signedEnrollment(t, s, key, "one", "电脑", b)
+	next := signedEnrollment(t, s, key, "one", "Computer", b)
 	if e := s.Enroll(ctx, next); e != nil {
 		t.Fatal(e)
 	}
@@ -186,8 +186,8 @@ func TestEnrollmentPublicSurfaceAndCapacity(t *testing.T) {
 func TestFirstEnrollmentSerialGate(t *testing.T) {
 	s, key := enrollmentStore(t)
 	ctx := context.Background()
-	a := signedEnrollment(t, s, key, "a", "电脑", strings.Repeat("a", 64))
-	b := signedEnrollment(t, s, key, "b", "手机", strings.Repeat("b", 64))
+	a := signedEnrollment(t, s, key, "a", "Computer", strings.Repeat("a", 64))
+	b := signedEnrollment(t, s, key, "b", "Phone", strings.Repeat("b", 64))
 	var wg sync.WaitGroup
 	results := make(chan error, 2)
 	for _, in := range []Enrollment{a, b} {

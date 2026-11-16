@@ -1,57 +1,53 @@
-# xSync
+# xSync для своего VPS
 
-English | [简体中文](README.zh-CN.md)
+Бэкенд синхронизации для плагина xSync из папки `extension`. Требуется Linux VPS со статическим публичным IPv4, Docker и Docker Compose. Откройте TCP-порты 80 и 8443. PostgreSQL и внутренний HTTP-бэкенд слушают только loopback.
 
-Sync an Obsidian vault between your devices with a self-hosted server and end-to-end encryption. Share one server with friends: each user has their own access key and vaults, and the server cannot decrypt vault contents.
+## Развёртывание
 
-[Install xSync](https://community.obsidian.md/plugins/xsync) · [Server setup](docs/DEPLOYMENT.md) · [Installation guide](docs/SETUP.md)
+```sh
+umask 077
+cp .env.example .env
+mkdir -p secrets
+test -s secrets/recovery.key || openssl rand -hex 32 > secrets/recovery.key
+openssl rand -hex 24
+```
 
-Free and open source. Both the plugin and admin page support English and Simplified Chinese.
+В `.env` укажите публичный IPv4, почту для Let’s Encrypt и вывод последней команды в `POSTGRES_PASSWORD`. Запустите:
 
-## Features
+```sh
+docker compose up -d --build
+docker compose logs -f certbot
+```
 
-- Multiple users: create separate accounts for yourself and friends, each with their own access key and vaults.
-- End-to-end encryption: sync notes, attachments, and shareable configuration without letting the server decrypt them.
-- Compare conflicting edits, select a version, keep both, merge text manually, or postpone the decision while other files continue syncing.
-- Set file-size, folder, extension, and regular-expression exclusions independently on each device.
-- Pause and resume with your saved key. Persistent queues recover interrupted work and catch up when the app returns to the foreground.
+Сервис становится доступен по `https://IP:8443` после выпуска сертификата. Certbot проверяет продление каждые 12 часов, а Nginx загружает обновлённый сертификат автоматически. При добавлении домена направьте его A-запись на VPS, откройте TCP-порт 443, заполните `SYNC_DOMAIN` и выполните `docker compose up -d`. В плагине можно оставить IP или войти по новому адресу.
 
-## Screenshots
+## Аккаунты
 
-| Obsidian plugin | User and access key management |
-| :---: | :---: |
-| [![Obsidian plugin](docs/images/plugin-settings-en.jpg)](docs/images/plugin-settings-en.jpg) | [![User and access key management](docs/images/admin-users-en.jpg)](docs/images/admin-users-en.jpg) |
+```sh
+docker compose run --rm xsyncctl user add alice
+docker compose run --rm xsyncctl user passwd alice
+```
 
-## Quick start
+`add` создаёт аккаунт, `passwd` устанавливает новый пароль. Обе команды спрашивают пароль в терминале. Активным устройствам нужно войти заново после смены или сброса пароля. На устройстве пользователя достаточно установить плагин и ввести адрес, логин и пароль.
 
-1. **Deploy the server** using [`ycw0818/xsync-server`](https://hub.docker.com/r/ycw0818/xsync-server) from Docker Hub. Follow the [deployment guide](docs/DEPLOYMENT.md).
-2. **Create a user** in the admin page and save their access key.
-3. **Connect Obsidian**: install xSync, enter the server address and access key, then create or join a vault. See the [connection guide](docs/SETUP.md).
+## Резервное копирование
 
-## Requirements
+На время копирования остановите бэкенд и операции с аккаунтами. Сохраните вместе дамп PostgreSQL, том `private-xsync_objects` и закрытый файл `secrets/recovery.key` в отдельном защищённом месте.
 
-- Obsidian **1.14.4 or later**. Android credential-storage integration and device testing are pending.
-- The server currently uses PostgreSQL; SQLite support is in development.
-- Sync runs in the foreground and catches up when you return. Continuous background or locked-screen sync is not guaranteed.
-- Current files and unresolved conflicts are retained. There is no version-history or recycle-bin interface. Back up your vault before first use.
+```sh
+mkdir -p backup
+docker compose stop server
+docker compose exec -T postgres pg_dump -U xsync -Fc xsync > backup/postgres.dump
+docker run --rm -v private-xsync_objects:/data:ro -v "$PWD/backup:/backup" alpine \
+  tar -czf /backup/objects.tar.gz -C /data .
+cp -p secrets/recovery.key backup/recovery.key
+docker compose start server
+```
 
-## Privacy
+Для восстановления запустите только PostgreSQL в чистом экземпляре, загрузите дамп через `pg_restore`, восстановите архив в том объектов и верните тот же ключ в `secrets/recovery.key`. Запустите сервисы и войдите с тестового клиента. Владелец VPS может использовать ключ восстановления для доступа к заметкам. Обычный бэкенд получает зашифрованные объекты, а ключ восстановления доступен контейнеру `xsyncctl`.
 
-The plugin connects to the server you configure. Contents, paths, and shareable configuration snapshots are encrypted. User labels, vault display names, device names, file identities, sizes, and synchronization metadata remain visible to the server. The server receives the access key for authorization, stores only its digest, and never receives vault encryption passwords or content-decryption keys. Local credentials use operating-system protection without a plaintext fallback.
+## Проверки
 
-There is no analytics, advertising, or plugin self-updater. Device credentials, workspace layouts, the core-plugin enable list, and xSync's own files stay local. Unknown secret fields in other plugins' settings may require explicit exclusion.
+`go test ./...` проверяет сервер. Для интеграционного теста входа, изоляции, статистики и сброса пароля задайте `XSYNC_ACCOUNT_TEST_DSN` с адресом отдельного тестового PostgreSQL на `127.0.0.1`.
 
-## Development and documentation
-
-See the [contributing guide](CONTRIBUTING.md) for development and tests.
-
-For Go/PostgreSQL integration and recovery tests, see the [contribution guide](CONTRIBUTING.md) and [development workflow](docs/testing/DEVELOPMENT.md).
-
-- [Documentation index](docs/README.md)
-- [Installation](docs/SETUP.md) and [deployment](docs/DEPLOYMENT.md)
-- [Protocol reference](protocol/README.md)
-- [Release process](docs/RELEASING.md) and [changelog](CHANGELOG.md)
-
-## License
-
-[MIT](LICENSE). Upstream template and dependency notices are retained in [plugin/licenses](plugin/licenses); see [template attribution](plugin/TEMPLATE.md).
+Исходная версия — [xSync 0.2.3](https://github.com/deku0818/xSync/tree/0.2.3), лицензия MIT.

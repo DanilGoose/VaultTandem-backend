@@ -204,10 +204,6 @@ func (m *ManagedServer) Handler() http.Handler {
 		clone.URL.Path = strings.TrimPrefix(r.URL.Path, "/sync/"+id)
 		s.Handler().ServeHTTP(w, clone)
 	})
-	if !m.passwordAccounts {
-		mux.Handle("GET /admin/", adminFiles())
-		mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/admin/", http.StatusSeeOther) })
-	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
