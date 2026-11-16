@@ -259,7 +259,7 @@ func (m *ManagedServer) loginClientIP(r *http.Request) string {
 	peer = peer.Unmap()
 	for _, trusted := range m.trustedProxies {
 		if trusted.Contains(peer) {
-			// Nginx must overwrite this header with its TCP client's address.
+			// The reverse proxy must overwrite this header with its TCP client's address.
 			forwarded, err := netip.ParseAddr(r.Header.Get("X-Real-IP"))
 			if err == nil && forwarded.Zone() == "" {
 				return forwarded.Unmap().String()

@@ -1,0 +1,24 @@
+{
+	admin off
+	email {$ACME_EMAIL}
+	default_sni {$PUBLIC_IPV4}
+}
+
+(sync_backend) {
+	request_body {
+		max_size 17MB
+	}
+	reverse_proxy 127.0.0.1:8873 {
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+https://{$PUBLIC_IPV4}:8443 {
+	tls {
+		issuer acme https://acme-v02.api.letsencrypt.org/directory {
+			profile shortlived
+			disable_tlsalpn_challenge
+		}
+	}
+	import sync_backend
+}

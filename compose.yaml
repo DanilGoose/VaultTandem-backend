@@ -1,7 +1,7 @@
-name: private-xsync
+name: vaulttandem
 
 x-backend: &backend
-  image: private-xsync-server:local
+  image: vaulttandem-server:local
   build:
     context: .
     dockerfile: Dockerfile
@@ -56,34 +56,23 @@ services:
         bind:
           create_host_path: false
 
-  nginx:
-    image: nginx:1.28-alpine
+  caddy:
+    image: caddy:2.11.4-alpine
     network_mode: host
     restart: unless-stopped
-    environment:
-      SYNC_DOMAIN: "${SYNC_DOMAIN:-}"
-    entrypoint: ["/bin/sh", "/deploy/nginx.sh"]
-    volumes:
-      - ./deploy:/deploy:ro
-      - acme:/var/www/acme:ro
-      - certs:/etc/letsencrypt:ro
-
-  certbot:
-    image: certbot/certbot:v5.4.0
-    restart: unless-stopped
-    depends_on: [nginx]
+    depends_on: [server]
     environment:
       PUBLIC_IPV4: "${PUBLIC_IPV4:?Set PUBLIC_IPV4}"
       ACME_EMAIL: "${ACME_EMAIL:?Set ACME_EMAIL}"
       SYNC_DOMAIN: "${SYNC_DOMAIN:-}"
-    entrypoint: ["/bin/sh", "/deploy/certbot.sh"]
+    entrypoint: ["/bin/sh", "/etc/vaulttandem/start-caddy.sh"]
     volumes:
-      - ./deploy:/deploy:ro
-      - acme:/var/www/acme
-      - certs:/etc/letsencrypt
+      - ./deploy:/etc/vaulttandem:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   postgres:
   objects:
-  acme:
-  certs:
+  caddy-data:
+  caddy-config:

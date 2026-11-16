@@ -1,6 +1,6 @@
-# xSync для своего VPS
+# VaultTandem для VPS
 
-Бэкенд синхронизации для плагина xSync из папки `extension`. Требуется Linux VPS со статическим публичным IPv4, Docker и Docker Compose. Откройте TCP-порты 80 и 8443. PostgreSQL и внутренний HTTP-бэкенд слушают только loopback.
+Бэкенд синхронизации для плагина VaultTandem из папки `extension`. Требуется Linux VPS со статическим публичным IPv4, Docker и Docker Compose. Откройте TCP-порты 80 и 8443. PostgreSQL и внутренний HTTP-бэкенд слушают только loopback.
 
 ## Развёртывание
 
@@ -16,10 +16,10 @@ openssl rand -hex 24
 
 ```sh
 docker compose up -d --build
-docker compose logs -f certbot
+docker compose logs -f caddy
 ```
 
-Сервис становится доступен по `https://IP:8443` после выпуска сертификата. Certbot проверяет продление каждые 12 часов, а Nginx загружает обновлённый сертификат автоматически. При добавлении домена направьте его A-запись на VPS, откройте TCP-порт 443, заполните `SYNC_DOMAIN` и выполните `docker compose up -d`. В плагине можно оставить IP или войти по новому адресу.
+Сервис становится доступен по `https://IP:8443` после выпуска сертификата. Caddy получает и продлевает сертификат Let’s Encrypt на IP с профилем shortlived. При добавлении домена направьте его A-запись на VPS, откройте TCP-порт 443, заполните `SYNC_DOMAIN` и выполните `docker compose up -d`. В плагине можно оставить IP или войти по новому адресу.
 
 ## Аккаунты
 
@@ -32,13 +32,13 @@ docker compose run --rm xsyncctl user passwd alice
 
 ## Резервное копирование
 
-На время копирования остановите бэкенд и операции с аккаунтами. Сохраните вместе дамп PostgreSQL, том `private-xsync_objects` и закрытый файл `secrets/recovery.key` в отдельном защищённом месте.
+На время копирования остановите бэкенд и операции с аккаунтами. Сохраните вместе дамп PostgreSQL, том `vaulttandem_objects` и закрытый файл `secrets/recovery.key` в отдельном защищённом месте.
 
 ```sh
 mkdir -p backup
 docker compose stop server
 docker compose exec -T postgres pg_dump -U xsync -Fc xsync > backup/postgres.dump
-docker run --rm -v private-xsync_objects:/data:ro -v "$PWD/backup:/backup" alpine \
+docker run --rm -v vaulttandem_objects:/data:ro -v "$PWD/backup:/backup" alpine \
   tar -czf /backup/objects.tar.gz -C /data .
 cp -p secrets/recovery.key backup/recovery.key
 docker compose start server

@@ -281,7 +281,7 @@ func serve(ctx context.Context, listen string, handler http.Handler, cert, key s
 		defer cancel()
 		_ = srv.Shutdown(shutdown)
 	}()
-	log.Print("xSync server on ", listen)
+	log.Print("VaultTandem server on ", listen)
 	var e error
 	if cert != "" {
 		e = srv.ListenAndServeTLS(cert, key)
