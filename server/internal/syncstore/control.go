@@ -14,13 +14,15 @@ import (
 )
 
 type ManagedServer struct {
-	Pool           *pgxpool.Pool
-	config         Config
-	password       [32]byte
-	mu             sync.Mutex
-	stores         map[string]*Store
-	attempts       map[string]loginAttempt
-	trustedProxies []netip.Prefix
+	Pool             *pgxpool.Pool
+	config           Config
+	password         [32]byte
+	passwordAccounts bool
+	accountWork      chan struct{}
+	mu               sync.Mutex
+	stores           map[string]*Store
+	attempts         map[string]loginAttempt
+	trustedProxies   []netip.Prefix
 }
 type loginAttempt struct {
 	at    time.Time
@@ -52,7 +54,7 @@ type NewVault struct {
 }
 
 func NewManagedServer(ctx context.Context, c Config, password string) (*ManagedServer, error) {
-	if utf8.RuneCountInString(password) < 12 {
+	if password != "" && utf8.RuneCountInString(password) < 12 {
 		return nil, errors.New("XSYNC_ADMIN_PASSWORD must contain at least 12 characters")
 	}
 	if c.VaultID != "" || c.Epoch != "" || len(c.KeyPackage) > 0 || len(c.Devices) > 0 {
@@ -82,11 +84,16 @@ func NewManagedServer(ctx context.Context, c Config, password string) (*ManagedS
 		p.Close()
 		return nil, errors.New("managed mode requires an empty database; legacy vault migration is not supported")
 	}
-	if _, e = p.Exec(ctx, "DELETE FROM admin_sessions"); e != nil {
+	if password == "" {
+		_, e = p.Exec(ctx, "INSERT INTO account_server(id) VALUES($1) ON CONFLICT(singleton) DO NOTHING", opaqueID())
+	} else {
+		_, e = p.Exec(ctx, "DELETE FROM admin_sessions")
+	}
+	if e != nil {
 		p.Close()
 		return nil, e
 	}
-	return &ManagedServer{Pool: p, config: c, password: sha256.Sum256([]byte(password)), stores: map[string]*Store{}, attempts: map[string]loginAttempt{}, trustedProxies: trustedProxies}, nil
+	return &ManagedServer{Pool: p, config: c, passwordAccounts: password == "", accountWork: make(chan struct{}, 2), password: sha256.Sum256([]byte(password)), stores: map[string]*Store{}, attempts: map[string]loginAttempt{}, trustedProxies: trustedProxies}, nil
 }
 
 func (m *ManagedServer) Close() {

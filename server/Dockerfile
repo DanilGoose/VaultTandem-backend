@@ -19,6 +19,8 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags='-s -w' -o /out/xsync-server ./cmd/obsidiansync
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+    go build -trimpath -ldflags='-s -w' -o /out/xsyncctl ./cmd/xsyncctl
 RUN mkdir -p /runtime/objects && chown -R 65532:65532 /runtime
 
 FROM scratch
@@ -26,6 +28,7 @@ COPY LICENSE /usr/share/licenses/xsync/LICENSE
 COPY --from=admin /src/node_modules/dompurify/LICENSE /usr/share/licenses/dompurify/LICENSE
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/xsync-server /usr/local/bin/xsync-server
+COPY --from=build /out/xsyncctl /usr/local/bin/xsyncctl
 COPY --from=build --chown=65532:65532 /runtime/ /data/
 USER 65532:65532
 WORKDIR /data

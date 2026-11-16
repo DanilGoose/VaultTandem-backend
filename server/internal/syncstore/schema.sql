@@ -176,3 +176,23 @@ CREATE TABLE IF NOT EXISTS admin_sessions (
 CREATE TABLE IF NOT EXISTS admin_audit (
  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), message text NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS password_accounts (
+ user_id text PRIMARY KEY REFERENCES sync_users(id) ON DELETE CASCADE,
+ password_salt bytea NOT NULL,
+ password_hash bytea NOT NULL,
+ key_envelope jsonb NOT NULL,
+ recovery_envelope bytea NOT NULL
+);
+CREATE TABLE IF NOT EXISTS account_sessions (
+ token_hash bytea PRIMARY KEY,
+ user_id text NOT NULL REFERENCES sync_users(id) ON DELETE CASCADE,
+ key_revision bigint NOT NULL,
+ expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_sessions_user ON account_sessions(user_id);
+CREATE INDEX IF NOT EXISTS account_sessions_expiry ON account_sessions(expires_at);
+CREATE TABLE IF NOT EXISTS account_server (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),
+ id text NOT NULL
+);

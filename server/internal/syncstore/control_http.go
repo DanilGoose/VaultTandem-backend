@@ -23,114 +23,120 @@ func (m *ManagedServer) adminOnly(next http.HandlerFunc) http.HandlerFunc {
 
 func (m *ManagedServer) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /admin/api/login", m.login)
-	mux.HandleFunc("GET /admin/api/session", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, 200, map[string]bool{"authenticated": true})
-	}))
-	mux.HandleFunc("POST /admin/api/logout", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		c, _ := r.Cookie("xsync_admin")
-		_, e := m.Pool.Exec(r.Context(), "DELETE FROM admin_sessions WHERE token_hash=$1", hashSecret(c.Value))
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		http.SetCookie(w, &http.Cookie{Name: "xsync_admin", Value: "", Path: "/admin", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
-		writeJSON(w, 200, map[string]bool{"loggedOut": true})
-	}))
-	mux.HandleFunc("GET /admin/api/users", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		u, e := m.Users(r.Context())
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]any{"users": u})
-	}))
-	mux.HandleFunc("POST /admin/api/users", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			Name string `json:"name"`
-		}
-		if e := decodeBody(w, r, &in); e != nil {
-			writeError(w, e)
-			return
-		}
-		u, key, e := m.CreateUser(r.Context(), in.Name)
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 201, map[string]any{"user": u, "key": key})
-	}))
-	mux.HandleFunc("POST /admin/api/users/{id}/key", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		key, e := m.RotateKey(r.Context(), r.PathValue("id"))
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]string{"key": key})
-	}))
-	mux.HandleFunc("PUT /admin/api/users/{id}", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			Active *bool `json:"active"`
-		}
-		if e := decodeBody(w, r, &in); e != nil || in.Active == nil {
-			writeError(w, code("INVALID_REQUEST"))
-			return
-		}
-		if e := m.SetUserActive(r.Context(), r.PathValue("id"), *in.Active); e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]bool{"updated": true})
-	}))
-	mux.HandleFunc("DELETE /admin/api/users/{id}", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			Name string `json:"name"`
-		}
-		if e := decodeBody(w, r, &in); e != nil {
-			writeError(w, e)
-			return
-		}
-		pending, e := m.DeleteUser(r.Context(), r.PathValue("id"), in.Name)
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]bool{"deleted": true, "cleanupPending": pending})
-	}))
-	mux.HandleFunc("GET /admin/api/vaults", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		v, e := m.Vaults(r.Context(), "")
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]any{"vaults": v})
-	}))
-	mux.HandleFunc("GET /admin/api/audit", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
-		rows, e := m.Pool.Query(r.Context(), "SELECT at,message FROM admin_audit ORDER BY id DESC LIMIT 100")
-		if e != nil {
-			writeError(w, e)
-			return
-		}
-		defer rows.Close()
-		type entry struct {
-			At      time.Time `json:"at"`
-			Message string    `json:"message"`
-		}
-		out := []entry{}
-		for rows.Next() {
-			var v entry
-			if e = rows.Scan(&v.At, &v.Message); e != nil {
+	if !m.passwordAccounts {
+		mux.HandleFunc("POST /admin/api/login", m.login)
+		mux.HandleFunc("GET /admin/api/session", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, map[string]bool{"authenticated": true})
+		}))
+		mux.HandleFunc("POST /admin/api/logout", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			c, _ := r.Cookie("xsync_admin")
+			_, e := m.Pool.Exec(r.Context(), "DELETE FROM admin_sessions WHERE token_hash=$1", hashSecret(c.Value))
+			if e != nil {
 				writeError(w, e)
 				return
 			}
-			out = append(out, v)
-		}
-		if e = rows.Err(); e != nil {
-			writeError(w, e)
-			return
-		}
-		writeJSON(w, 200, map[string]any{"entries": out})
-	}))
+			http.SetCookie(w, &http.Cookie{Name: "xsync_admin", Value: "", Path: "/admin", HttpOnly: true, SameSite: http.SameSiteStrictMode, MaxAge: -1})
+			writeJSON(w, 200, map[string]bool{"loggedOut": true})
+		}))
+		mux.HandleFunc("GET /admin/api/users", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			u, e := m.Users(r.Context())
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]any{"users": u})
+		}))
+		mux.HandleFunc("POST /admin/api/users", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			var in struct {
+				Name string `json:"name"`
+			}
+			if e := decodeBody(w, r, &in); e != nil {
+				writeError(w, e)
+				return
+			}
+			u, key, e := m.CreateUser(r.Context(), in.Name)
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 201, map[string]any{"user": u, "key": key})
+		}))
+		mux.HandleFunc("POST /admin/api/users/{id}/key", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			key, e := m.RotateKey(r.Context(), r.PathValue("id"))
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]string{"key": key})
+		}))
+		mux.HandleFunc("PUT /admin/api/users/{id}", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			var in struct {
+				Active *bool `json:"active"`
+			}
+			if e := decodeBody(w, r, &in); e != nil || in.Active == nil {
+				writeError(w, code("INVALID_REQUEST"))
+				return
+			}
+			if e := m.SetUserActive(r.Context(), r.PathValue("id"), *in.Active); e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]bool{"updated": true})
+		}))
+		mux.HandleFunc("DELETE /admin/api/users/{id}", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			var in struct {
+				Name string `json:"name"`
+			}
+			if e := decodeBody(w, r, &in); e != nil {
+				writeError(w, e)
+				return
+			}
+			pending, e := m.DeleteUser(r.Context(), r.PathValue("id"), in.Name)
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]bool{"deleted": true, "cleanupPending": pending})
+		}))
+		mux.HandleFunc("GET /admin/api/vaults", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			v, e := m.Vaults(r.Context(), "")
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]any{"vaults": v})
+		}))
+		mux.HandleFunc("GET /admin/api/audit", m.adminOnly(func(w http.ResponseWriter, r *http.Request) {
+			rows, e := m.Pool.Query(r.Context(), "SELECT at,message FROM admin_audit ORDER BY id DESC LIMIT 100")
+			if e != nil {
+				writeError(w, e)
+				return
+			}
+			defer rows.Close()
+			type entry struct {
+				At      time.Time `json:"at"`
+				Message string    `json:"message"`
+			}
+			out := []entry{}
+			for rows.Next() {
+				var v entry
+				if e = rows.Scan(&v.At, &v.Message); e != nil {
+					writeError(w, e)
+					return
+				}
+				out = append(out, v)
+			}
+			if e = rows.Err(); e != nil {
+				writeError(w, e)
+				return
+			}
+			writeJSON(w, 200, map[string]any{"entries": out})
+		}))
+	} else {
+		mux.HandleFunc("POST /api/auth/login", m.accountLogin)
+		mux.HandleFunc("POST /api/auth/password", m.accountPassword)
+		mux.HandleFunc("GET /api/storage/usage", m.accountUsage)
+	}
 	mux.HandleFunc("GET /api/connection", func(w http.ResponseWriter, r *http.Request) {
 		u, e := m.access(r.Context(), bearer(r))
 		if e != nil {
@@ -198,8 +204,10 @@ func (m *ManagedServer) Handler() http.Handler {
 		clone.URL.Path = strings.TrimPrefix(r.URL.Path, "/sync/"+id)
 		s.Handler().ServeHTTP(w, clone)
 	})
-	mux.Handle("GET /admin/", adminFiles())
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/admin/", http.StatusSeeOther) })
+	if !m.passwordAccounts {
+		mux.Handle("GET /admin/", adminFiles())
+		mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/admin/", http.StatusSeeOther) })
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -266,7 +274,7 @@ func (m *ManagedServer) loginClientIP(r *http.Request) string {
 	return peer.String()
 }
 
-func (m *ManagedServer) login(w http.ResponseWriter, r *http.Request) {
+func (m *ManagedServer) allowLogin(r *http.Request) bool {
 	host := m.loginClientIP(r)
 	now := time.Now()
 	m.mu.Lock()
@@ -279,8 +287,7 @@ func (m *ManagedServer) login(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, known := m.attempts[host]; !known && len(m.attempts) >= 1024 {
 		m.mu.Unlock()
-		writeError(w, code("LOGIN_RATE_LIMITED"))
-		return
+		return false
 	}
 	a := m.attempts[host]
 	if now.Sub(a.at) >= time.Minute {
@@ -290,6 +297,13 @@ func (m *ManagedServer) login(w http.ResponseWriter, r *http.Request) {
 	m.attempts[host] = a
 	m.mu.Unlock()
 	if a.count > 10 {
+		return false
+	}
+	return true
+}
+
+func (m *ManagedServer) login(w http.ResponseWriter, r *http.Request) {
+	if !m.allowLogin(r) {
 		writeError(w, code("LOGIN_RATE_LIMITED"))
 		return
 	}

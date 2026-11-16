@@ -122,7 +122,13 @@ func (m *ManagedServer) SetUserActive(ctx context.Context, id string, active boo
 
 func (m *ManagedServer) access(ctx context.Context, key string) (User, error) {
 	var u User
-	e := m.Pool.QueryRow(ctx, "SELECT id,name,active,key_revision FROM sync_users WHERE key_hash=$1 AND deleted_at IS NULL", hashSecret(key)).Scan(&u.ID, &u.Name, &u.Active, &u.Revision)
+	query := "SELECT id,name,active,key_revision FROM sync_users WHERE key_hash=$1 AND deleted_at IS NULL"
+	if m.passwordAccounts {
+		query = `SELECT u.id,u.name,u.active,u.key_revision FROM account_sessions a
+			JOIN sync_users u ON u.id=a.user_id WHERE a.token_hash=$1 AND a.expires_at>now()
+			AND a.key_revision=u.key_revision AND u.deleted_at IS NULL`
+	}
+	e := m.Pool.QueryRow(ctx, query, hashSecret(key)).Scan(&u.ID, &u.Name, &u.Active, &u.Revision)
 	if e != nil {
 		return u, code("UNAUTHORIZED")
 	}

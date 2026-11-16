@@ -160,6 +160,9 @@ func main() {
 			}
 			password = strings.TrimRight(string(secret), "\r\n")
 		}
+		if password == "" && os.Getenv("XSYNC_PASSWORD_ACCOUNTS") != "1" {
+			log.Fatal("set XSYNC_PASSWORD_ACCOUNTS=1 or configure the legacy administrator password")
+		}
 		manager, err := syncstore.NewManagedServer(ctx, c, password)
 		if err != nil {
 			log.Fatal("managed server startup failed: ", err)
