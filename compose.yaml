@@ -1,0 +1,89 @@
+name: private-xsync
+
+x-backend: &backend
+  image: private-xsync-server:local
+  build:
+    context: .
+    dockerfile: server/Dockerfile
+  network_mode: host
+  environment:
+    XSYNC_DATABASE_URL: "postgres://xsync:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@127.0.0.1:55439/xsync?sslmode=disable"
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xsync
+      POSTGRES_DB: xsync
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}"
+    ports:
+      - "127.0.0.1:55439:5432"
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xsync -d xsync"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    <<: *backend
+    restart: unless-stopped
+    environment:
+      XSYNC_DATABASE_URL: "postgres://xsync:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@127.0.0.1:55439/xsync?sslmode=disable"
+      XSYNC_PASSWORD_ACCOUNTS: "1"
+      XSYNC_TRUSTED_PROXIES: "127.0.0.1/32"
+    volumes:
+      - objects:/data
+
+  xsyncctl:
+    <<: *backend
+    profiles: ["cli"]
+    user: "0:0"
+    entrypoint: ["/usr/local/bin/xsyncctl"]
+    environment:
+      XSYNC_DATABASE_URL: "postgres://xsync:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@127.0.0.1:55439/xsync?sslmode=disable"
+      XSYNC_RECOVERY_KEY_FILE: /run/secrets/recovery
+    volumes:
+      - type: bind
+        source: ./secrets/recovery.key
+        target: /run/secrets/recovery
+        read_only: true
+        bind:
+          create_host_path: false
+
+  nginx:
+    image: nginx:1.28-alpine
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      SYNC_DOMAIN: "${SYNC_DOMAIN:-}"
+    entrypoint: ["/bin/sh", "/deploy/nginx.sh"]
+    volumes:
+      - ./deploy:/deploy:ro
+      - acme:/var/www/acme:ro
+      - certs:/etc/letsencrypt:ro
+
+  certbot:
+    image: certbot/certbot:v5.4.0
+    restart: unless-stopped
+    depends_on: [nginx]
+    environment:
+      PUBLIC_IPV4: "${PUBLIC_IPV4:?Set PUBLIC_IPV4}"
+      ACME_EMAIL: "${ACME_EMAIL:?Set ACME_EMAIL}"
+      SYNC_DOMAIN: "${SYNC_DOMAIN:-}"
+    entrypoint: ["/bin/sh", "/deploy/certbot.sh"]
+    volumes:
+      - ./deploy:/deploy:ro
+      - acme:/var/www/acme
+      - certs:/etc/letsencrypt
+
+volumes:
+  postgres:
+  objects:
+  acme:
+  certs:
